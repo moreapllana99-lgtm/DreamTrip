@@ -1,61 +1,71 @@
-import { Trip, Itinerary } from './types';
-import { generateItinerary } from './mock-data';
+import { Trip, Itinerary } from "./types";
+import { generateItinerary } from "./mock-data";
 
-// Simulate AI trip planning with mock responses
+// ─── Real AI via API route (server-side OpenRouter proxy) ───
+// Falls back to mock data when the API is unreachable or not configured.
+
+async function callAI(action: "chat" | "plan", payload: unknown) {
+  try {
+    const res = await fetch("/api/ai", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...(payload as Record<string, unknown>) }),
+    });
+    if (!res.ok) throw new Error("AI API error");
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ─── AI Trip Planner ───
 export async function planTrip(tripData: Partial<Trip>): Promise<Itinerary> {
-  // Simulate API call delay
-  await new Promise((resolve) => setTimeout(resolve, 2000 + Math.random() * 2000));
+  // Try real AI first
+  const data = await callAI("plan", { tripData });
+  if (data?.itinerary) {
+    return data.itinerary as Itinerary;
+  }
 
-  // Generate itinerary based on trip data
+  // Fallback to mock
+  await new Promise((resolve) => setTimeout(resolve, 1500 + Math.random() * 1500));
   const itinerary = generateItinerary(tripData);
-
-  // Add some randomness to make it feel like AI
-  itinerary.summary = `After analyzing millions of data points, here's your personalized ${itinerary.dailyPlan.length}-day journey through ${tripData.destination}. We've curated the perfect blend of ${tripData.interests?.join(', ') || 'activities'} tailored to your ${tripData.travelStyle || 'preferred'} travel style.`;
-
+  itinerary.summary = `After analyzing millions of data points, here's your personalized ${itinerary.dailyPlan.length}-day journey through ${tripData.destination}. We've curated the perfect blend of ${tripData.interests?.join(", ") || "activities"} tailored to your ${tripData.travelStyle || "preferred"} travel style.`;
   return itinerary;
 }
 
-// AI Chat responses
-const chatResponses: Record<string, string[]> = {
-  pack: [
-    "Here's what you should pack: 1) Comfortable walking shoes 👟 2) Weather-appropriate layers 🧥 3) Universal power adapter 🔌 4) Portable charger 🔋 5) Sunscreen 🧴 6) First aid kit 💊 7) Copies of important documents 📄 8) Reusable water bottle 💧",
-  ],
-  cheap: [
-    'To find cheap restaurants: 1) Use local food apps like Yelp or Google Maps 🗺️ 2) Eat where locals eat — avoid tourist zones 🍜 3) Try street food markets 🏪 4) Look for lunch specials (often cheaper than dinner) 💰 5) Check university areas for budget eats 🎓',
-  ],
-  money: [
-    "For a typical trip, budget $50-100/day for budget travel, $100-200/day for mid-range, and $200-400+/day for luxury. Always bring 20% extra for unexpected expenses! 💳 Don't forget to notify your bank about travel plans.",
-  ],
-  scams: [
-    'Watch out for these common scams: 1) "Free" bracelets or flowers that suddenly cost money 🌹 2) Unofficial taxis with rigged meters 🚕 3) "Closed hotel" redirects 🏨 4) Overpriced currency exchange 💱 5) Pickpockets in crowded areas 🎒 Always research common scams for your specific destination!',
-  ],
-  language: [
-    'Most major tourist destinations have English speakers. However, learning a few phrases goes a long way: "Hello", "Thank you", "Please", "How much?", and "Where is...?" 🌍 I recommend downloading Google Translate offline for emergencies! 📱',
-  ],
-  weather: [
-    "Check the weather forecast before you go! Pack layers for variable conditions. May-September is generally great for Europe, November-March for Southeast Asia, December-April for the Caribbean. Always bring a light rain jacket just in case! 🌦️",
-  ],
-  visa: [
-    'Visa requirements vary by passport. Check your destination\'s official embassy website. Many countries offer visa-free travel for 30-90 days. For longer stays, you may need to apply in advance. Consider visa processing times (can take 2-8 weeks)! 🛂',
-  ],
-  safety: [
-    'Stay safe by: 1) Sharing your itinerary with family 📋 2) Saving emergency numbers 📞 3) Using official transportation 🚕 4) Keeping valuables in hotel safe 🔒 5) Being aware of your surroundings 👀 6) Having travel insurance 🏥 7) Making digital copies of documents 💾',
-  ],
-};
+// ─── AI Chat ───
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
 
-export async function getChatResponse(message: string): Promise<string> {
-  await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 1000));
+export async function getChatResponse(
+  message: string,
+  history: ChatMessage[] = []
+): Promise<string> {
+  const messages = [
+    ...history,
+    { role: "user" as const, content: message },
+  ];
 
+  // Try real AI
+  const data = await callAI("chat", { messages });
+  if (data?.reply) return data.reply;
+
+  // Fallback to keyword matching
+  await new Promise((resolve) => setTimeout(resolve, 800 + Math.random() * 800));
   const msg = message.toLowerCase();
 
-  if (msg.includes('pack')) return chatResponses.pack[0];
-  if (msg.includes('cheap') || msg.includes('restaurant')) return chatResponses.cheap[0];
-  if (msg.includes('money') || msg.includes('budget') || msg.includes('cost')) return chatResponses.money[0];
-  if (msg.includes('scam') || msg.includes('avoid')) return chatResponses.scams[0];
-  if (msg.includes('language') || msg.includes('speak')) return chatResponses.language[0];
-  if (msg.includes('weather')) return chatResponses.weather[0];
-  if (msg.includes('visa') || msg.includes('passport')) return chatResponses.visa[0];
-  if (msg.includes('safe') || msg.includes('danger')) return chatResponses.safety[0];
+  if (msg.includes("pack")) return "Here's what you should pack: 1) Comfortable walking shoes 👟 2) Weather-appropriate layers 🧥 3) Universal power adapter 🔌 4) Portable charger 🔋 5) Sunscreen 🧴 6) First aid kit 💊 7) Copies of important documents 📄 8) Reusable water bottle 💧";
+  if (msg.includes("cheap") || msg.includes("restaurant")) return "To find cheap restaurants: 1) Use local food apps like Yelp 🗺️ 2) Eat where locals eat — avoid tourist zones 🍜 3) Try street food markets 🏪 4) Lunch specials are often cheaper 💰 5) University areas have budget eats 🎓";
+  if (msg.includes("money") || msg.includes("budget") || msg.includes("cost")) return "Budget $50-100/day for budget travel, $100-200/day mid-range, $200-400+/day luxury. Always bring 20% extra for unexpected expenses! 💳";
+  if (msg.includes("scam") || msg.includes("avoid")) return "Watch out for: 1) 'Free' items that cost money 🌹 2) Unofficial taxis 🚕 3) 'Closed hotel' redirects 🏨 4) Bad currency exchange 💱 5) Pickpockets in crowds 🎒 Research common scams for your destination!";
+  if (msg.includes("language") || msg.includes("speak")) return "Most tourist spots have English speakers. Learn: 'Hello', 'Thank you', 'Please', 'How much?', 'Where is...?' 🌍 Download Google Translate offline! 📱";
+  if (msg.includes("weather")) return "Check forecasts before you go! May-Sep = Europe, Nov-Mar = SE Asia, Dec-Apr = Caribbean. Always bring a light rain jacket! 🌦️";
+  if (msg.includes("visa") || msg.includes("passport")) return "Visa rules vary by passport. Check your destination's embassy website. Many countries offer visa-free 30-90 day stays. Apply 2-8 weeks ahead! 🛂";
+  if (msg.includes("safe") || msg.includes("danger")) return "Stay safe: 1) Share itinerary with family 📋 2) Save emergency numbers 📞 3) Use official transport 🚕 4) Hotel safe for valuables 🔒 5) Stay aware 👀 6) Travel insurance 🏥";
+  if (msg.includes("hotel") || msg.includes("stay")) return "Look for hotels with 4+ star reviews on Booking.com or Agoda. Check cancellation policies and proximity to public transport. 🏨 Book 2-4 weeks ahead for best rates!";
+  if (msg.includes("flight") || msg.includes("fly")) return "Use Google Flights or Skyscanner to compare prices. Book 6-8 weeks ahead for international, 3-4 weeks for domestic. Set price alerts! ✈️ Tuesday and Wednesday are often cheapest.";
 
-  return "Great question! I'm here to help with all your travel needs. You can ask me about packing tips, budgeting, local cuisine, safety advice, or anything travel-related! ✈️🌍";
+  return "Great question! I'm here to help with all your travel needs — ask me about destinations, packing, budgeting, food, safety, or anything travel-related! ✈️🌍";
 }

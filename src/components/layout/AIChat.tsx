@@ -42,12 +42,16 @@ export default function AIChat() {
     if (!msg || isLoading) return;
 
     const userMsg: Message = { id: Date.now().toString(), role: "user", content: msg };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
     setInput("");
     setIsLoading(true);
 
     try {
-      const response = await getChatResponse(msg);
+      const history = newMessages
+        .filter((m) => m.id !== "welcome")
+        .map((m) => ({ role: m.role, content: m.content }));
+      const response = await getChatResponse(msg, history.slice(0, -1));
       const assistantMsg: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
